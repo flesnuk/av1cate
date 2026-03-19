@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>av1cate — AV1 Encoder</title>
+  <meta name="description" content="Professional AV1 encoding queue manager with segment support.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ── Reset & tokens ────────────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #000;
+      --bg-1: #0a0a0a;
+      --bg-2: #111;
+      --bg-3: #161616;
+      --border: rgba(255, 255, 255, 0.1);
+      --border-md: rgba(255, 255, 255, 0.18);
+      --text: #ededed;
+      --text-muted: #888;
+      --text-dim: #555;
+      --accent: #fff;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Inter', system-ui, sans-serif;
+      --radius: 6px;
+      --radius-lg: 10px;
+    }
+
+    html {
+      font-size: 14px;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0 24px 60px;
+    }
+
+    /* ── Top bar ───────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+    }
+
+    .logo-icon svg {
+      color: #000;
+    }
+
+    #server-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s;
+    }
+
+    .dot.active {
+      background: #3ecf8e;
+      box-shadow: 0 0 6px #3ecf8e88;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 780px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ── Card ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+
+    .card:hover {
+      border-color: var(--border-md);
+    }
+
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    /* ── Controls (Play / Stop) ────────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      grid-column: 1 / -1;
+      align-items: center;
+    }
+
+    /* ── Buttons ───────────────────────────────────────────────────── */
+    button {
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 0.82rem;
+      font-weight: 500;
+      border-radius: var(--radius);
+      padding: 8px 16px;
+      transition: background 0.15s, color 0.15s, transform 0.1s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    /* outlined (default) */
+    .btn {
+      background: transparent;
+      border: 1px solid var(--border-md);
+      color: var(--text);
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    /* solid white */
+    .btn-solid {
+      background: #fff;
+      border: 1px solid #fff;
+      color: #000;
+    }
+
+    .btn-solid:hover {
+      background: #e0e0e0;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+    }
+
+    /* danger outlined */
+    .btn-danger {
+      background: transparent;
+      border: 1px solid rgba(255, 82, 82, 0.35);
+      color: #ff5252;
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 82, 82, 0.08);
+      border-color: #ff5252;
+    }
+
+    /* small */
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 0.75rem;
+    }
+
+    /* ── Form elements ─────────────────────────────────────────────── */
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.01em;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 9px 12px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.35);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .input-with-btn {
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-with-btn input {
+      flex: 1;
+    }
+
+    /* checkbox */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #fff;
+      cursor: pointer;
+    }
+
+    .checkbox-row label {
+      margin: 0;
+      color: var(--text);
+      font-size: 0.82rem;
+    }
+
+    /* ── Table ─────────────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    thead tr {
+      background: var(--bg-2);
+    }
+
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* status badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge-pendiente {
+      border: 1px solid rgba(255, 200, 80, 0.4);
+      color: #f5c842;
+      background: rgba(245, 200, 66, 0.06);
+    }
+
+    .badge-procesando {
+      border: 1px solid rgba(80, 160, 255, 0.4);
+      color: #60a5fa;
+      background: rgba(96, 165, 250, 0.08);
+    }
+
+    .badge-completada {
+      border: 1px solid rgba(62, 207, 142, 0.4);
+      color: #3ecf8e;
+      background: rgba(62, 207, 142, 0.06);
+    }
+
+    .badge-error {
+      border: 1px solid rgba(255, 82, 82, 0.4);
+      color: #ff5252;
+      background: rgba(255, 82, 82, 0.06);
+    }
+
+    .mode-tag {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .progress-line {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: #60a5fa;
+      margin-top: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 280px;
+    }
+
+    .error-line {
+      font-size: 0.72rem;
+      color: #ff5252;
+      margin-top: 5px;
+      font-family: var(--mono);
+    }
+
+    .filename {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty-row td {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-dim);
+      font-size: 0.82rem;
+    }
+
+    /* ── Modal (file browser) ──────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-box {
+      background: var(--bg-1);
+      border: 1px solid var(--border-md);
+      border-radius: var(--radius-lg);
+      width: min(680px, 92vw);
+      height: min(520px, 80vh);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .path-display {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      padding: 0 4px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 20px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.12s;
+      font-size: 0.82rem;
+    }
+
+    .file-item:last-child {
+      border-bottom: none;
+    }
+
+    .file-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .file-item .icon {
+      font-size: 1rem;
+      opacity: 0.7;
+    }
+
+    .file-item .name {
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    .file-item.is-dir .name {
+      color: var(--text-muted);
+    }
+
+    /* ── Scrollbar ─────────────────────────────────────────────────── */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* ── Section header ────────────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    /* ── Full-width queue section ──────────────────────────────────── */
+    .queue-section {
+      grid-column: 1 / -1;
+    }
+
+    /* ── Divider ───────────────────────────────────────────────────── */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 20px 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21 3H3v18l4-4h14V3zm-10 9l-3-3 1.41-1.41L11 9.17l4.59-4.58L17 6l-6 6z" />
+        </svg>
+      </div>
+      av1cate
+    </div>
+    <div id="server-status">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">conectando…</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="grid">
+
+      <!-- ── Controls ── -->
+      <div class="card controls">
+        <button class="btn-solid" onclick="control('play')">▶ Play</button>
+        <button class="btn btn-sm" onclick="control('stop')">⏹ Stop</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-sm" onclick="fetchJobs()">↻ Refresh</button>
+      </div>
+
+      <!-- ── Add job form ── -->
+      <div class="card">
+        <div class="card-title">Nuevo trabajo</div>
+        <form id="jobForm" onsubmit="addJob(event)">
+
+          <div class="form-group">
+            <label>Ruta del archivo (mp4 / mkv)</label>
+            <div class="input-with-btn">
+              <input type="text" id="input_path" required placeholder="/ruta/absoluta/al/video.mp4">
+              <button type="button" class="btn btn-sm" onclick="openBrowser(lastVisitedPath)">📁</button>
+            </div>
+          </div>
+
+          <div class="form-row form-group">
+            <div>
+              <label>Preset (1–10)</label>
+              <input type="number" id="preset" value="4" min="1" max="10">
+            </div>
+            <div>
+              <label>CRF (10–60)</label>
+              <input type="number" id="crf" value="35" min="10" max="60">
+            </div>
+            <div>
+              <label>Tune (0–5)</label>
+              <input type="number" id="tune" value="0" min="0" max="5">
+            </div>
+          </div>
+
+          <hr>
+
+          <div class="checkbox-row">
+            <input type="checkbox" id="encode_opus">
+            <label for="encode_opus">Convertir audio a Opus</label>
+          </div>
+
+          <div class="form-row-2 form-group">
+            <div>
+              <label>Calidad Opus (kbps)</label>
+              <input type="number" id="opus_quality" value="128">
+            </div>
+            <div>
+              <!-- spacer -->
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Parámetros extra para SvtAv1EncApp</label>
+            <input type="text" id="optional_params" placeholder="--scd 1 --film-grain 4">
+          </div>
+
+          <button type="submit" class="btn-solid" style="width:100%; margin-top:4px;">
+            + Encolar trabajo
+          </button>
+        </form>
+      </div>
+
+      <!-- ── Info card ── -->
+      <div class="card" style="align-self: start;">
+        <div class="card-title">Cómo funciona</div>
+        <p style="color:var(--text-muted); line-height:1.7; font-size:0.82rem;">
+          Al procesar un trabajo, el servidor comprueba si existe un fichero
+          <code style="font-family:var(--mono); color:var(--text); background:var(--bg-2);
+               padding:1px 5px; border-radius:3px;">&lt;video&gt;.csv</code>
+          junto al vídeo de entrada.<br><br>
+          <strong>Con CSV</strong> → modo <em>segmentos</em>: codifica sólo las escenas
+          definidas en el CSV usando <code style="font-family:var(--mono); color:var(--text);
+        background:var(--bg-2); padding:1px 5px; border-radius:3px;">av1kut</code>.<br><br>
+          <strong>Sin CSV</strong> → modo <em>estándar</em>: codificación completa del
+          fichero con SvtAv1EncApp + mkvmerge.
+        </p>
+
+        <hr>
+
+        <div class="card-title" style="margin-top:0;">Formato CSV</div>
+        <pre style="font-family:var(--mono); font-size:0.75rem; color:var(--text-muted);
+                  background:var(--bg-2); padding:12px; border-radius:var(--radius);
+                  border:1px solid var(--border); overflow-x:auto;">Start,End
+12.500,45.000
+102.000,178.300</pre>
+        <p style="font-size:0.75rem; color:var(--text-dim); margin-top:8px;">
+          Timestamps en segundos. Guardar como <code style="font-family:var(--mono);">video.mp4.csv</code>
+        </p>
+      </div>
+
+      <!-- ── Queue table ── -->
+      <div class="card queue-section">
+        <div class="section-header">
+          <div class="card-title" style="margin:0;">Cola de trabajos</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Archivo</th>
+                <th>Preset / CRF</th>
+                <th>Modo</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="jobsTable">
+              <tr class="empty-row">
+                <td colspan="6">Sin trabajos en cola</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── File browser modal ── -->
+  <div id="browserModal" class="modal-overlay" onclick="handleOverlayClick(event)">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="path-display" id="currentPathDisplay">/</span>
+        <button class="modal-close" onclick="closeBrowser()">✕</button>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ───────────────────────────────────────────────────────────────
+    let lastVisitedPath = '';
+    const modal = document.getElementById('browserModal');
+
+    // ── Status polling ──────────────────────────────────────────────────────
+    async function fetchJobs() {
+      try {
+        const res = await fetch('/api/jobs');
+        const data = await res.json();
+
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-text');
+        if (data.is_running) {
+          dot.classList.add('active');
+          txt.textContent = 'procesando cola';
+        } else {
+          dot.classList.remove('active');
+          txt.textContent = 'cola pausada';
+        }
+
+        const tbody = document.getElementById('jobsTable');
+        if (!data.jobs.length) {
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Sin trabajos en cola</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.jobs.map(job => {
+          const filename = job.input_path.split('/').pop();
+          const statusBadge = `<span class="badge badge-${job.status}">${job.status}</span>`;
+          const modeTag = `<div class="mode-tag">${job.mode || 'standard'}</div>`;
+          const progress = job.status === 'procesando' && job.current_progress
+            ? `<div class="progress-line">${esc(job.current_progress)}</div>` : '';
+          const summary = job.status === 'completada' && job.final_summary
+            ? `<div class="progress-line" style="color:#3ecf8e">${esc(job.final_summary)}</div>` : '';
+          const errLine = job.error_message
+            ? `<div class="error-line">${esc(job.error_message)}</div>` : '';
+          const delBtn = job.status !== 'procesando'
+            ? `<button class="btn btn-danger btn-sm" onclick="deleteJob('${job.id}')">Eliminar</button>` : '';
+
+          return `<tr>
+          <td><code style="font-family:var(--mono); color:var(--text-muted)">${job.id}</code></td>
+          <td>
+            <div class="filename" title="${esc(job.input_path)}">${esc(filename)}${job.encode_opus ? ' 🎶' : ''}</div>
+          </td>
+          <td><span style="font-family:var(--mono)">${job.preset} / ${job.crf}</span></td>
+          <td>${modeTag}</td>
+          <td>${statusBadge}${progress}${summary}${errLine}</td>
+          <td>${delBtn}</td>
+        </tr>`;
+        }).join('');
+      } catch (e) {
+        console.error('fetchJobs error', e);
+      }
+    }
+
+    // Refresh every 15 s
+    setInterval(fetchJobs, 15000);
+    fetchJobs();
+
+    // ── Controls ─────────────────────────────────────────────────────────────
+    async function control(action) {
+      await fetch(`/api/control/${action}`, { method: 'POST' });
+      fetchJobs();
+    }
+
+    async function deleteJob(id) {
+      if (!confirm('¿Eliminar esta tarea?')) return;
+      await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      fetchJobs();
+    }
+
+    async function addJob(e) {
+      e.preventDefault();
+      const payload = {
+        input_path: document.getElementById('input_path').value,
+        preset: parseInt(document.getElementById('preset').value),
+        crf: parseInt(document.getElementById('crf').value),
+        tune: parseInt(document.getElementById('tune').value),
+        encode_opus: document.getElementById('encode_opus').checked,
+        opus_quality: parseInt(document.getElementById('opus_quality').value),
+        optional_params: document.getElementById('optional_params').value
+      };
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        document.getElementById('input_path').value = '';
+      }
+      fetchJobs();
+    }
+
+    // ── File browser ──────────────────────────────────────────────────────────
+    async function openBrowser(path = '') {
+      try {
+        const target = path || lastVisitedPath || '';
+        const res = await fetch(`/api/browse?path=${encodeURIComponent(target)}`);
+        if (!res.ok) throw new Error('No se pudo leer el directorio.');
+        const data = await res.json();
+
+        lastVisitedPath = data.current_path;
+        document.getElementById('currentPathDisplay').textContent = data.current_path;
+
+        const list = document.getElementById('fileList');
+        list.innerHTML = data.items.map(item => `
+        <div class="file-item ${item.is_dir ? 'is-dir' : ''}"
+             onclick="${item.is_dir ? `openBrowser('${item.path.replace(/'/g, "\\'")}')` : `selectFile('${item.path.replace(/'/g, "\\'")}')`}">
+          <span class="icon">${item.is_dir ? '📁' : '🎞️'}</span>
+          <span class="name">${esc(item.name)}</span>
+        </div>`).join('');
+
+        modal.classList.add('open');
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    function selectFile(path) {
+      document.getElementById('input_path').value = path;
+      closeBrowser();
+    }
+
+    function closeBrowser() {
+      modal.classList.remove('open');
+    }
+
+    function handleOverlayClick(e) {
+      if (e.target === modal) closeBrowser();
+    }
+
+    // ── Utils ─────────────────────────────────────────────────────────────────
+    function esc(str) {
+      return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+
+</html>
