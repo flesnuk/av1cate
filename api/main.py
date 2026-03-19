@@ -78,6 +78,18 @@ ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
 # Helpers
 # ---------------------------------------------------------------------------
 
+def get_kut_progress(log_file: str) -> str:
+    """Read the tail of the SVT-AV1 log and return the last progress line."""
+    try:
+        with open(log_file, "rb") as f:
+            lines = f.readlines()
+            lines = [line for line in lines if line.strip()]
+            if lines:
+                return lines[-1].decode('utf-8', errors='ignore')
+    except Exception:
+        pass
+    return ""
+
 def get_last_progress(log_file: str) -> str:
     """Read the tail of the SVT-AV1 log and return the last progress line."""
     try:
@@ -177,6 +189,12 @@ async def _process_job_segments(job: Job, input_path: Path, csv_path: str):
 
     fps = av1kut.get_fps(str(input_path))
     segments_data = av1kut.load_segments_from_timestamps_csv(csv_path, fps)
+    
+    base_name  = input_path.stem
+    dir_name   = input_path.parent
+    log_txt    = dir_name / f"{base_name}_temp.log"
+
+    job.log_file = str(log_txt)
 
     if not segments_data:
         raise ValueError(f"CSV {csv_path} does not contain valid segments.")
@@ -202,6 +220,7 @@ async def _process_job_segments(job: Job, input_path: Path, csv_path: str):
         opus_bitrate=str(job.opus_quality),
         output_path=output_path,
         work_dir=str(input_path.parent),
+        log_file=str(log_txt),
     )
 
     job.final_summary = f"Segments: {len(segments_data)} | Output: {Path(output).name}"
@@ -388,7 +407,10 @@ def get_jobs():
     """Return all jobs and global queue state."""
     for job in jobs_db.values():
         if job.status == JobStatus.PROCESSING and job.log_file:
-            job.current_progress = get_last_progress(job.log_file)
+            if job.log_file.endswith('log'):
+                job.current_progress = get_kut_progress(job.log_file)
+            else:
+                job.current_progress = get_last_progress(job.log_file)
     return {
         "is_running": is_running,
         "queue":      queue,

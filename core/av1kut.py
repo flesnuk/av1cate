@@ -10,15 +10,16 @@ import os
 import csv
 import asyncio
 import shlex
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
 # Type alias for segment data
-# (start_time_s, end_time_s, start_frame, end_frame)
+# (start_time_s, end_time_s, start_frame, end_frame, name)
 # ---------------------------------------------------------------------------
-Segment = Tuple[float, float, int, int]
+Segment = Tuple[float, float, int, int, str]
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +59,8 @@ def load_segments_from_timestamps_csv(csv_path: str, fps: float) -> List[Segment
         for row in reader:
             start_t = float(row['Start'])
             end_t = float(row['End'])
-            segments.append((start_t, end_t, round(start_t * fps), round(end_t * fps)))
+            name_t = row['Name']
+            segments.append((start_t, end_t, round(start_t * fps), round(end_t * fps), name_t))
     return segments
 
 
@@ -72,7 +74,8 @@ def load_segments_from_frames_csv(csv_path: str, fps: float) -> List[Segment]:
         for row in reader:
             start_f = int(row['Start'])
             end_f = int(row['End'])
-            segments.append((start_f / fps, end_f / fps, start_f, end_f))
+            name_t = row['Name']
+            segments.append((start_f / fps, end_f / fps, start_f, end_f, name_t))
     return segments
 
 
@@ -108,6 +111,55 @@ async def _run_cmd(cmd: List[str], capture_stderr: bool = False) -> None:
             f"Command failed (code {proc.returncode}): {' '.join(cmd)}\n{msg}"
         )
 
+def append_line_to_log_file(log_file: str, line: str) -> None:
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write("\n" + line)
+
+def merge_video_params(base_params: List[str], overrides_str: str) -> List[str]:
+    """
+    Merges base SvtAv1EncApp parameters with an override string.
+    Overrides from the string take precedence.
+    """
+    if not overrides_str or not str(overrides_str).strip():
+        return list(base_params)
+        
+    overrides = shlex.split(str(overrides_str))
+    
+    def parse_params(params: List[str]) -> dict:
+        parsed = {}
+        i = 0
+        while i < len(params):
+            p = params[i]
+            if p.startswith('-'):
+                # Check if next element is a value (e.g. doesn't start with '-' followed by letter)
+                is_value_next = (
+                    i + 1 < len(params) and 
+                    not (params[i+1].startswith('-') and len(params[i+1]) > 2 and params[i+1][2].isalpha())
+                )
+                if is_value_next:
+                    parsed[p] = params[i+1]
+                    i += 2
+                else:
+                    parsed[p] = None
+                    i += 1
+            else:
+                parsed[p] = None
+                i += 1
+        return parsed
+
+    base_dict = parse_params(base_params)
+    over_dict = parse_params(overrides)
+    
+    base_dict.update(over_dict)
+    
+    result = []
+    for k, v in base_dict.items():
+        if k.startswith('-'):
+            result.append(k)
+            if v is not None:
+                result.append(v)
+            
+    return result
 
 # ---------------------------------------------------------------------------
 # Core processing function (async)
@@ -120,6 +172,7 @@ async def process_segments(
     opus_bitrate: str = "128",
     output_path: Optional[str] = None,
     work_dir: Optional[str] = None,
+    log_file: Optional[str] = None,
 ) -> str:
     """
     Encode the specified segments of a video to AV1 + Opus and mux into an MKV.
@@ -132,6 +185,7 @@ async def process_segments(
     opus_bitrate  : Opus VBR target in kbps (default "128").
     output_path   : Destination MKV path. Auto-generated if None.
     work_dir      : Directory for temp files. Defaults to source video's directory.
+    log_file      : Path to the log file. Auto-generated if None.
 
     Returns
     -------
@@ -167,19 +221,29 @@ async def process_segments(
     concat_list  = tmp("_kut_audio_list.txt")
 
     try:
-        for i, (start_time, end_time, start_frame, end_frame) in enumerate(segments_data):
+        for i, (start_time, end_time, start_frame, end_frame, name_t) in enumerate(segments_data):
             num_frames = end_frame - start_frame
             ivf_out  = tmp(f"_kut_seg_{i}.ivf")
             flac_out = tmp(f"_kut_seg_{i}.flac")
+
+            append_line_to_log_file(log_file, f"Encoding segment {i+1}/{len(segments_data)}: frame {start_frame} → {end_frame} ({num_frames} frames)" )
+
+            # use name_t as a override params
+            # so for example if it has --crf 35, it would replace the original 
+            # --crf 40 from the extra params
+            cmd_video_params = extra_params
+            if name_t and name_t.strip():
+                cmd_video_params = merge_video_params(extra_params, name_t)
 
             # 1. Encode video segment
             print(f"  [kut] Encoding segment {i}: frame {start_frame} → {end_frame} ({num_frames} frames)")
             cmd_video = [
                 "SvtAv1EncApp", "-i", video_file, "-b", ivf_out,
                 "--skip", str(start_frame), "--frames", str(num_frames),
-            ] + extra_params
-            await _run_cmd(cmd_video)
+            ] + cmd_video_params
+            print(f"  [kut] Command: {' '.join(cmd_video)}")
             segments_video.append(ivf_out)
+            await _run_cmd(cmd_video)
 
             # 2. Extract audio segment
             duration = end_time - start_time
@@ -216,11 +280,19 @@ async def process_segments(
         await _run_cmd(["mkvmerge", "-o", output_path, merged_video, merged_audio])
 
         print(f"  [kut] Done! Output: {output_path}")
+
+        # delete log file
+        if log_file and os.path.exists(log_file):
+            os.remove(log_file)
         return output_path
 
     finally:
         # 6. Cleanup all temp files
+        print("  [kut] Cleaning up temp files...")
+        time.sleep(0.5) # sleep a bit to ensure async process finishes
         all_temps = segments_video + segments_audio + [merged_video, merged_audio, concat_list]
+        if log_file and os.path.exists(log_file):
+            os.remove(log_file)
         for temp_file in all_temps:
             try:
                 if os.path.exists(temp_file):
