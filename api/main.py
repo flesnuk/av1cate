@@ -427,6 +427,31 @@ def get_dashboard():
 @app.post("/api/jobs", response_model=Job)
 def create_job(job_in: JobCreate):
     """Enqueue a new encoding job."""
+    input_path = Path(job_in.input_path)
+    if not input_path.is_file():
+        raise HTTPException(status_code=400, detail="Input file does not exist.")
+
+    # Check if a job with the same preset and crf is already in the queue
+    for job in jobs_db.values():
+        if job.input_path == job_in.input_path and job.status in [JobStatus.PENDING, JobStatus.PROCESSING]:
+            if job.preset == job_in.preset and job.crf == job_in.crf:
+                raise HTTPException(status_code=400, detail="A job with these parameters (preset/crf) is already in the queue.")
+
+    # Calculate expected output filename
+    base_name = input_path.stem
+    dir_name = input_path.parent
+    
+    from core import av1kut
+    csv_candidate = av1kut.csv_exists_for_video(str(input_path))
+    if csv_candidate:
+        expected_output = dir_name / f"{base_name}_kut_{job_in.preset}P{job_in.crf}Q.mkv"
+    else:
+        expected_output = dir_name / f"{base_name}_{job_in.preset}P{job_in.crf}Q.mkv"
+        
+    # Block if output file is already generated
+    if expected_output.exists():
+        raise HTTPException(status_code=400, detail="The output file with these parameters (preset/crf) is already generated.")
+
     job_id  = str(uuid.uuid4())[:8]
     new_job = Job(id=job_id, **job_in.dict())
     jobs_db[job_id] = new_job

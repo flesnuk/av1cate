@@ -463,8 +463,8 @@
       background: var(--bg-1);
       border: 1px solid var(--border-md);
       border-radius: var(--radius-lg);
-      width: min(680px, 92vw);
-      height: min(520px, 80vh);
+      width: min(850px, 95vw);
+      height: min(800px, 90vh);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -885,6 +885,9 @@
       });
       if (res.ok) {
         document.getElementById('input_path').value = '';
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Error enqueueing job');
       }
       fetchJobs();
     }
