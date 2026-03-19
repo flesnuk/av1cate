@@ -15,6 +15,7 @@ import shlex
 import uuid
 import re
 import time
+import os
 from pathlib import Path
 from typing import List, Optional, Dict
 from contextlib import asynccontextmanager
@@ -124,6 +125,9 @@ async def run_command(cmd: List[str], log_file: Optional[str] = None):
 
     print(f"  [cmd] {' '.join(cmd)}")
 
+    full_env = os.environ.copy()
+    full_env["NO_COLOR"] = "1"
+
     f_log = None
     try:
         if log_file:
@@ -132,6 +136,7 @@ async def run_command(cmd: List[str], log_file: Optional[str] = None):
                 *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=f_log,
+                env=full_env
             )
             await current_process.wait()
         else:
@@ -139,6 +144,7 @@ async def run_command(cmd: List[str], log_file: Optional[str] = None):
                 *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
+                env=full_env
             )
             _, stderr = await current_process.communicate()
 
