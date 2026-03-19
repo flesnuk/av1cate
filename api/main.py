@@ -135,9 +135,35 @@ async def run_command(cmd: List[str], log_file: Optional[str] = None):
             current_process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
-                stderr=f_log,
+                stderr=asyncio.subprocess.PIPE,
                 env=full_env
             )
+            last_write_time = time.time()
+            buffer = ""
+            while True:
+                chunk = await current_process.stderr.read(1024)
+                if not chunk:
+                    break
+                
+                buffer += chunk.decode("utf-8", errors="ignore")
+                
+                now = time.time()
+                if now - last_write_time >= 5.0:
+                    lines = buffer.replace('\n', '\r').split('\r')
+                    last_line = ""
+                    for l in reversed(lines):
+                        if l.strip():
+                            last_line = l.strip() + "\n"
+                            break
+                            
+                    if last_line:
+                        f_log.write(last_line.encode("utf-8"))
+                        f_log.flush()
+                        last_write_time = now
+                    
+                    # Keep only the last potentially incomplete segment
+                    buffer = lines[-1] if lines else ""
+                    
             await current_process.wait()
         else:
             current_process = await asyncio.create_subprocess_exec(
