@@ -141,7 +141,7 @@ async def run_command(cmd: List[str], log_file: Optional[str] = None):
             last_write_time = time.time()
             buffer = ""
             while True:
-                chunk = await current_process.stderr.read(1024)
+                chunk = await current_process.stderr.read(2048)
                 if not chunk:
                     break
                 

@@ -21,20 +21,22 @@
     }
 
     :root {
-      --bg: #000;
-      --bg-1: #0a0a0a;
-      --bg-2: #111;
-      --bg-3: #161616;
-      --border: rgba(255, 255, 255, 0.1);
-      --border-md: rgba(255, 255, 255, 0.18);
-      --text: #ededed;
-      --text-muted: #888;
-      --text-dim: #555;
-      --accent: #fff;
+      --bg: radial-gradient(ellipse at center, #3c6b32 0%, #3c6b32 45%, #152912 100%);
+      --bg-1: #24421f;
+      --bg-2: #2e5227;
+      --bg-3: #3b6632;
+      --border: rgba(162, 214, 118, 0.2);
+      --border-md: rgba(162, 214, 118, 0.4);
+      --text: #eef7e6;
+      --text-muted: #b5d6b0;
+      --text-dim: #82ad7b;
+      --accent: #a2d676;
+      --accent-brown: #8e5836;
+      --accent-brown-hover: #704426;
       --mono: 'JetBrains Mono', monospace;
       --sans: 'Inter', system-ui, sans-serif;
-      --radius: 6px;
-      --radius-lg: 10px;
+      --radius: 8px;
+      --radius-lg: 16px;
     }
 
     html {
@@ -44,6 +46,7 @@
     body {
       font-family: var(--sans);
       background: var(--bg);
+      background-attachment: fixed;
       color: var(--text);
       min-height: 100vh;
       padding: 0 24px 60px;
@@ -71,14 +74,15 @@
     .logo-icon {
       width: 28px;
       height: 28px;
-      background: var(--accent);
-      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent), #529b35);
+      border-radius: 8px;
       display: grid;
       place-items: center;
+      box-shadow: 0 2px 8px rgba(139, 184, 98, 0.3);
     }
 
     .logo-icon svg {
-      color: #000;
+      color: #111;
     }
 
     #server-status {
@@ -181,14 +185,16 @@
 
     /* solid white */
     .btn-solid {
-      background: #fff;
-      border: 1px solid #fff;
-      color: #000;
+      background: var(--accent-brown);
+      border: 1px solid var(--accent-brown);
+      color: #e3f2d8;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
     .btn-solid:hover {
-      background: #e0e0e0;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+      background: var(--accent-brown-hover);
+      box-shadow: 0 4px 12px rgba(124, 74, 42, 0.3);
+      border-color: var(--accent-brown-hover);
     }
 
     /* danger outlined */
@@ -273,7 +279,7 @@
     input[type="checkbox"] {
       width: 14px;
       height: 14px;
-      accent-color: #fff;
+      accent-color: var(--accent-brown);
       cursor: pointer;
     }
 
