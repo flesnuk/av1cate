@@ -372,7 +372,7 @@
 
     .progress-line {
       font-family: var(--mono);
-      font-size: 0.72rem;
+      font-size: 0.6rem;
       color: #60a5fa;
       margin-top: 5px;
       word-break: break-all;
@@ -397,11 +397,16 @@
     }
 
     .col-params {
-      width: 280px;
+      width: 240px;
     }
 
     .col-status {
-      width: 700px;
+      width: 740px;
+    }
+
+    .col-duration {
+      width: 100px;
+      white-space: nowrap;
     }
 
     .col-del {
@@ -697,6 +702,7 @@
               <col class="col-mode">
               <col class="col-params">
               <col class="col-status">
+              <col class="col-duration">
               <col class="col-del">
             </colgroup>
             <thead>
@@ -707,12 +713,13 @@
                 <th>Mode</th>
                 <th>Params</th>
                 <th>Status</th>
+                <th>Duration</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="jobsTable">
               <tr class="empty-row">
-                <td colspan="7">No jobs in queue</td>
+                <td colspan="8">No jobs in queue</td>
               </tr>
             </tbody>
           </table>
@@ -756,7 +763,7 @@
 
         const tbody = document.getElementById('jobsTable');
         if (!data.jobs.length) {
-          tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No jobs in queue</td></tr>';
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No jobs in queue</td></tr>';
           return;
         }
 
@@ -773,6 +780,23 @@
           const delBtn = job.status !== 'processing'
             ? `<button class="btn btn-danger btn-sm" onclick="deleteJob('${job.id}')">Delete</button>` : '';
 
+          let durationStr = '—';
+          if (job.start_time) {
+            let endSecs = job.end_time;
+            if (!endSecs && job.status === 'processing') {
+              endSecs = Date.now() / 1000;
+            }
+            if (endSecs) {
+              const diff = Math.max(0, endSecs - job.start_time);
+              const hrs = Math.floor(diff / 3600);
+              const mins = Math.floor((diff % 3600) / 60);
+              const secs = Math.floor(diff % 60);
+              const p = (n) => n.toString().padStart(2, '0');
+              if (hrs > 0) durationStr = `<span style="font-family:var(--mono)">${hrs}:${p(mins)}:${p(secs)}</span>`;
+              else durationStr = `<span style="font-family:var(--mono)">${p(mins)}:${p(secs)}</span>`;
+            }
+          }
+
           const extraParams = job.optional_params
             ? `<span style="font-family:var(--mono); font-size:0.72rem; color:var(--text-muted); word-break:break-all">${esc(job.optional_params)}</span>`
             : `<span style="color:var(--text-dim); font-size:0.72rem;">—</span>`;
@@ -786,6 +810,7 @@
           <td>${modeTag}</td>
           <td>${extraParams}</td>
           <td>${statusBadge}${progress}${summary}${errLine}</td>
+          <td class="duration-cell" data-start="${job.start_time || ''}" data-end="${job.end_time || ''}" data-status="${job.status}">${durationStr}</td>
           <td>${delBtn}</td>
         </tr>`;
         }).join('');
@@ -797,6 +822,32 @@
     // Refresh every 15 s
     setInterval(fetchJobs, 15000);
     fetchJobs();
+
+    // Tick durations every 1s
+    setInterval(() => {
+      document.querySelectorAll('.duration-cell').forEach(cell => {
+        const start = cell.getAttribute('data-start');
+        const end = cell.getAttribute('data-end');
+        const status = cell.getAttribute('data-status');
+        if (start && start !== 'null') {
+          let endSecs = end && end !== 'null' ? parseFloat(end) : null;
+          if (!endSecs && status === 'processing') {
+            endSecs = Date.now() / 1000;
+          }
+          if (endSecs) {
+            const diff = Math.max(0, endSecs - parseFloat(start));
+            const hrs = Math.floor(diff / 3600);
+            const mins = Math.floor((diff % 3600) / 60);
+            const secs = Math.floor(diff % 60);
+            const p = (n) => n.toString().padStart(2, '0');
+            let ds = '';
+            if (hrs > 0) ds = `<span style="font-family:var(--mono)">${hrs}:${p(mins)}:${p(secs)}</span>`;
+            else ds = `<span style="font-family:var(--mono)">${p(mins)}:${p(secs)}</span>`;
+            cell.innerHTML = ds;
+          }
+        }
+      });
+    }, 5000);
 
     // ── Controls ─────────────────────────────────────────────────────────────
     async function control(action) {

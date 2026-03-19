@@ -14,6 +14,7 @@ import asyncio
 import shlex
 import uuid
 import re
+import time
 from pathlib import Path
 from typing import List, Optional, Dict
 from contextlib import asynccontextmanager
@@ -55,6 +56,8 @@ class Job(JobCreate):
     current_progress: Optional[str] = None
     final_summary:    Optional[str] = None
     mode:             str           = "standard"   # "standard" | "segments"
+    start_time:       Optional[float] = None
+    end_time:         Optional[float] = None
 
 
 # ---------------------------------------------------------------------------
@@ -317,18 +320,22 @@ async def worker_loop():
             current_job_id = job_id
             job = jobs_db[job_id]
             job.status = JobStatus.PROCESSING
+            job.start_time = time.time()
             job.error_message = None
 
             try:
                 await process_job(job)
                 if job.status == JobStatus.PROCESSING:
                     job.status = JobStatus.COMPLETED
+                    job.end_time = time.time()
                     queue.pop(0)
             except InterruptedError:
                 job.status = JobStatus.PENDING
+                job.start_time = None
                 print(f"[job:{job_id}] Interrupted → pending.")
             except Exception as e:
                 job.status = JobStatus.ERROR
+                job.end_time = time.time()
                 job.error_message = str(e)
                 queue.pop(0)
                 print(f"[job:{job_id}] Error: {e}")
@@ -440,6 +447,7 @@ async def stop_queue():
                 except Exception as e:
                     print(f"Could not delete {t}: {e}")
         job.status = JobStatus.PENDING
+        job.start_time = None
 
     return {"message": "Queue stopped. Temp files deleted and task reset."}
 
