@@ -31,19 +31,19 @@ from core import av1kut
 # ---------------------------------------------------------------------------
 
 class JobStatus:
-    PENDING    = "pendiente"
-    PROCESSING = "procesando"
-    COMPLETED  = "completada"
+    PENDING    = "pending"
+    PROCESSING = "processing"
+    COMPLETED  = "completed"
     ERROR      = "error"
 
 
 class JobCreate(BaseModel):
-    input_path:     str = Field(...,          description="Ruta completa del vídeo mp4/mkv")
+    input_path:     str = Field(...,          description="Full path of the mp4/mkv video")
     preset:         int = Field(default=4,    ge=1,  le=10)
     crf:            int = Field(default=35,   ge=10, le=60)
-    optional_params:str = Field(default="",  description="Parámetros extra para SvtAv1EncApp")
-    encode_opus:    bool= Field(default=False,description="Convertir audio a Opus (modo estándar)")
-    opus_quality:   int = Field(default=128,  description="Calidad Opus en kbps (modo estándar)")
+    optional_params:str = Field(default="",  description="Extra parameters for SvtAv1EncApp")
+    encode_opus:    bool= Field(default=False,description="Convert audio to Opus (standard mode)")
+    opus_quality:   int = Field(default=128,  description="Opus quality in kbps (standard mode)")
     tune:           int = Field(default=0,    ge=0,  le=5, description="Tune (0 a 5)")
 
 
@@ -105,7 +105,7 @@ async def run_command(cmd: List[str], log_file: Optional[str] = None):
     global current_process, is_running
 
     if not is_running:
-        raise InterruptedError("Cancelado por el usuario (Stop).")
+        raise InterruptedError("Cancelled by user (Stop).")
 
     print(f"  [cmd] {' '.join(cmd)}")
 
@@ -129,13 +129,13 @@ async def run_command(cmd: List[str], log_file: Optional[str] = None):
 
         if current_process.returncode != 0:
             if not is_running:
-                raise InterruptedError("Cancelado por el usuario (Stop).")
-            err_msg = "Error desconocido"
+                raise InterruptedError("Cancelled by user (Stop).")
+            err_msg = "Unknown error"
             if not log_file and stderr:
                 err_msg = stderr.decode(errors='ignore')
             elif log_file:
-                err_msg = f"El comando falló. Revisa el log: {log_file}"
-            raise RuntimeError(f"Falló con código {current_process.returncode}: {err_msg}")
+                err_msg = f"Command failed. Check log: {log_file}"
+            raise RuntimeError(f"Failed with code {current_process.returncode}: {err_msg}")
     finally:
         if f_log:
             f_log.close()
@@ -153,7 +153,7 @@ async def process_job(job: Job):
     """
     input_path = Path(job.input_path)
     if not input_path.is_file():
-        raise FileNotFoundError(f"El archivo {input_path} no existe.")
+        raise FileNotFoundError(f"File {input_path} does not exist.")
 
     # Check if a CSV exists alongside the input video
     csv_candidate = av1kut.csv_exists_for_video(str(input_path))
@@ -170,13 +170,13 @@ async def _process_job_segments(job: Job, input_path: Path, csv_path: str):
     Uses the timestamps CSV found next to the video.
     """
     job.mode = "segments"
-    print(f"[job:{job.id}] CSV encontrado ({csv_path}) → modo segmentos (av1kut)")
+    print(f"[job:{job.id}] CSV found ({csv_path}) → segments mode (av1kut)")
 
     fps = av1kut.get_fps(str(input_path))
     segments_data = av1kut.load_segments_from_timestamps_csv(csv_path, fps)
 
     if not segments_data:
-        raise ValueError(f"El CSV {csv_path} no contiene segmentos válidos.")
+        raise ValueError(f"CSV {csv_path} does not contain valid segments.")
 
     extra_params = shlex.split(job.optional_params) if job.optional_params else []
     # Inject preset / crf / tune into SvtAv1EncApp params for the kut pipeline
@@ -201,7 +201,7 @@ async def _process_job_segments(job: Job, input_path: Path, csv_path: str):
         work_dir=str(input_path.parent),
     )
 
-    job.final_summary = f"Segmentos: {len(segments_data)} | Salida: {Path(output).name}"
+    job.final_summary = f"Segments: {len(segments_data)} | Output: {Path(output).name}"
 
 
 async def _process_job_standard(job: Job, input_path: Path):
@@ -209,7 +209,7 @@ async def _process_job_standard(job: Job, input_path: Path):
     Full-file encode pipeline: SvtAv1EncApp → ffmpeg (audio) → mkvmerge → mkvpropedit.
     """
     job.mode = "standard"
-    print(f"[job:{job.id}] Sin CSV → modo estándar")
+    print(f"[job:{job.id}] No CSV → standard mode")
 
     base_name  = input_path.stem
     dir_name   = input_path.parent
@@ -326,7 +326,7 @@ async def worker_loop():
                     queue.pop(0)
             except InterruptedError:
                 job.status = JobStatus.PENDING
-                print(f"[job:{job_id}] Interrumpido → pendiente.")
+                print(f"[job:{job_id}] Interrupted → pending.")
             except Exception as e:
                 job.status = JobStatus.ERROR
                 job.error_message = str(e)
@@ -392,21 +392,21 @@ def get_jobs():
 @app.delete("/api/jobs/{job_id}")
 def delete_job(job_id: str):
     if job_id not in jobs_db:
-        raise HTTPException(status_code=404, detail="Trabajo no encontrado")
+        raise HTTPException(status_code=404, detail="Job not found")
     job = jobs_db[job_id]
     if job.status == JobStatus.PROCESSING:
-        raise HTTPException(status_code=400, detail="Para un detener un trabajo en curso pulsa Stop primero.")
+        raise HTTPException(status_code=400, detail="To stop an ongoing job, press Stop first.")
     if job_id in queue:
         queue.remove(job_id)
     del jobs_db[job_id]
-    return {"message": "Trabajo eliminado"}
+    return {"message": "Job deleted"}
 
 
 @app.post("/api/control/play")
 def play_queue():
     global is_running
     is_running = True
-    return {"message": "Cola iniciada"}
+    return {"message": "Queue started"}
 
 
 @app.post("/api/control/stop")
@@ -419,7 +419,7 @@ async def stop_queue():
             current_process.terminate()
             await asyncio.sleep(0.5)
         except Exception as e:
-            print(f"Error terminando proceso: {e}")
+            print(f"Error terminating process: {e}")
 
     if current_job_id and current_job_id in jobs_db:
         job = jobs_db[current_job_id]
@@ -438,10 +438,10 @@ async def stop_queue():
                 try:
                     t.unlink()
                 except Exception as e:
-                    print(f"No se pudo borrar {t}: {e}")
+                    print(f"Could not delete {t}: {e}")
         job.status = JobStatus.PENDING
 
-    return {"message": "Cola detenida. Temporales borrados y tarea reseteada."}
+    return {"message": "Queue stopped. Temp files deleted and task reset."}
 
 
 @app.get("/api/browse")
@@ -451,7 +451,7 @@ def browse_fs(path: Optional[str] = None):
         path = "/"
     p = Path(path)
     if not p.exists() or not p.is_dir():
-        raise HTTPException(status_code=400, detail="Directorio inválido o no existe")
+        raise HTTPException(status_code=400, detail="Invalid directory or does not exist")
 
     items = []
     if p.parent != p:

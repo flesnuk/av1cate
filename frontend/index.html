@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
@@ -339,19 +339,19 @@
       white-space: nowrap;
     }
 
-    .badge-pendiente {
+    .badge-pending {
       border: 1px solid rgba(255, 200, 80, 0.4);
       color: #f5c842;
       background: rgba(245, 200, 66, 0.06);
     }
 
-    .badge-procesando {
+    .badge-processing {
       border: 1px solid rgba(80, 160, 255, 0.4);
       color: #60a5fa;
       background: rgba(96, 165, 250, 0.08);
     }
 
-    .badge-completada {
+    .badge-completed {
       border: 1px solid rgba(62, 207, 142, 0.4);
       color: #3ecf8e;
       background: rgba(62, 207, 142, 0.06);
@@ -584,7 +584,7 @@
     </div>
     <div id="server-status">
       <span class="dot" id="status-dot"></span>
-      <span id="status-text">conectando…</span>
+      <span id="status-text">connecting...</span>
     </div>
   </header>
 
@@ -601,13 +601,13 @@
 
       <!-- ── Add job form ── -->
       <div class="card">
-        <div class="card-title">Nuevo trabajo</div>
+        <div class="card-title">New job</div>
         <form id="jobForm" onsubmit="addJob(event)">
 
           <div class="form-group">
-            <label>Ruta del archivo (mp4 / mkv)</label>
+            <label>File path (mp4 / mkv)</label>
             <div class="input-with-btn">
-              <input type="text" id="input_path" required placeholder="/ruta/absoluta/al/video.mp4">
+              <input type="text" id="input_path" required placeholder="/absolute/path/to/video.mp4">
               <button type="button" class="btn btn-sm" onclick="openBrowser(lastVisitedPath)">📁</button>
             </div>
           </div>
@@ -631,12 +631,12 @@
 
           <div class="checkbox-row">
             <input type="checkbox" id="encode_opus">
-            <label for="encode_opus">Convertir audio a Opus</label>
+            <label for="encode_opus">Convert audio to Opus</label>
           </div>
 
           <div class="form-row-2 form-group">
             <div>
-              <label>Calidad Opus (kbps)</label>
+              <label>Opus quality (kbps)</label>
               <input type="number" id="opus_quality" value="128">
             </div>
             <div>
@@ -645,48 +645,48 @@
           </div>
 
           <div class="form-group">
-            <label>Parámetros extra para SvtAv1EncApp</label>
+            <label>Extra parameters for SvtAv1EncApp</label>
             <input type="text" id="optional_params" placeholder="--scd 1 --film-grain 4">
           </div>
 
           <button type="submit" class="btn-solid" style="width:100%; margin-top:4px;">
-            + Encolar trabajo
+            + Enqueue job
           </button>
         </form>
       </div>
 
       <!-- ── Info card ── -->
       <div class="card" style="align-self: start;">
-        <div class="card-title">Cómo funciona</div>
+        <div class="card-title">How it works</div>
         <p style="color:var(--text-muted); line-height:1.7; font-size:0.82rem;">
-          Al procesar un trabajo, el servidor comprueba si existe un fichero
+          When processing a job, the server checks if a
           <code style="font-family:var(--mono); color:var(--text); background:var(--bg-2);
                padding:1px 5px; border-radius:3px;">&lt;video&gt;.csv</code>
-          junto al vídeo de entrada.<br><br>
-          <strong>Con CSV</strong> → modo <em>segmentos</em>: codifica sólo las escenas
-          definidas en el CSV usando <code style="font-family:var(--mono); color:var(--text);
+          file exists next to the input video.<br><br>
+          <strong>With CSV</strong> → <em>segments</em> mode: encodes only the scenes
+          defined in the CSV using <code style="font-family:var(--mono); color:var(--text);
         background:var(--bg-2); padding:1px 5px; border-radius:3px;">av1kut</code>.<br><br>
-          <strong>Sin CSV</strong> → modo <em>estándar</em>: codificación completa del
-          fichero con SvtAv1EncApp + mkvmerge.
+          <strong>Without CSV</strong> → <em>standard</em> mode: full file encode with
+          SvtAv1EncApp + mkvmerge.
         </p>
 
         <hr>
 
-        <div class="card-title" style="margin-top:0;">Formato CSV</div>
+        <div class="card-title" style="margin-top:0;">CSV Format</div>
         <pre style="font-family:var(--mono); font-size:0.75rem; color:var(--text-muted);
                   background:var(--bg-2); padding:12px; border-radius:var(--radius);
                   border:1px solid var(--border); overflow-x:auto;">Start,End
 12.500,45.000
 102.000,178.300</pre>
         <p style="font-size:0.75rem; color:var(--text-dim); margin-top:8px;">
-          Timestamps en segundos. Guardar como <code style="font-family:var(--mono);">video.mp4.csv</code>
+          Timestamps in seconds. Save as <code style="font-family:var(--mono);">video.mp4.csv</code>
         </p>
       </div>
 
       <!-- ── Queue table ── -->
       <div class="card queue-section">
         <div class="section-header">
-          <div class="card-title" style="margin:0;">Cola de trabajos</div>
+          <div class="card-title" style="margin:0;">Job queue</div>
         </div>
         <div class="table-wrap">
           <table>
@@ -702,17 +702,17 @@
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Archivo</th>
+                <th>File</th>
                 <th>Preset / CRF</th>
-                <th>Modo</th>
+                <th>Mode</th>
                 <th>Params</th>
-                <th>Estado</th>
+                <th>Status</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="jobsTable">
               <tr class="empty-row">
-                <td colspan="7">Sin trabajos en cola</td>
+                <td colspan="7">No jobs in queue</td>
               </tr>
             </tbody>
           </table>
@@ -748,15 +748,15 @@
         const txt = document.getElementById('status-text');
         if (data.is_running) {
           dot.classList.add('active');
-          txt.textContent = 'procesando cola';
+          txt.textContent = 'processing queue';
         } else {
           dot.classList.remove('active');
-          txt.textContent = 'cola pausada';
+          txt.textContent = 'queue paused';
         }
 
         const tbody = document.getElementById('jobsTable');
         if (!data.jobs.length) {
-          tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin trabajos en cola</td></tr>';
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No jobs in queue</td></tr>';
           return;
         }
 
@@ -764,14 +764,14 @@
           const filename = job.input_path.split('/').pop();
           const statusBadge = `<span class="badge badge-${job.status}">${job.status}</span>`;
           const modeTag = `<div class="mode-tag">${job.mode || 'standard'}</div>`;
-          const progress = job.status === 'procesando' && job.current_progress
+          const progress = job.status === 'processing' && job.current_progress
             ? `<div class="progress-line">${esc(job.current_progress)}</div>` : '';
-          const summary = job.status === 'completada' && job.final_summary
+          const summary = job.status === 'completed' && job.final_summary
             ? `<div class="progress-line" style="color:#3ecf8e">${esc(job.final_summary)}</div>` : '';
           const errLine = job.error_message
             ? `<div class="error-line">${esc(job.error_message)}</div>` : '';
-          const delBtn = job.status !== 'procesando'
-            ? `<button class="btn btn-danger btn-sm" onclick="deleteJob('${job.id}')">Eliminar</button>` : '';
+          const delBtn = job.status !== 'processing'
+            ? `<button class="btn btn-danger btn-sm" onclick="deleteJob('${job.id}')">Delete</button>` : '';
 
           const extraParams = job.optional_params
             ? `<span style="font-family:var(--mono); font-size:0.72rem; color:var(--text-muted); word-break:break-all">${esc(job.optional_params)}</span>`
@@ -805,7 +805,7 @@
     }
 
     async function deleteJob(id) {
-      if (!confirm('¿Eliminar esta tarea?')) return;
+      if (!confirm('Delete this job?')) return;
       await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
       fetchJobs();
     }
@@ -837,7 +837,7 @@
       try {
         const target = path || lastVisitedPath || '';
         const res = await fetch(`/api/browse?path=${encodeURIComponent(target)}`);
-        if (!res.ok) throw new Error('No se pudo leer el directorio.');
+        if (!res.ok) throw new Error('Could not read directory.');
         const data = await res.json();
 
         lastVisitedPath = data.current_path;
