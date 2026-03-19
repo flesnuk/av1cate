@@ -105,7 +105,7 @@
 
     /* ── Layout ────────────────────────────────────────────────────── */
     .main {
-      max-width: 1100px;
+      max-width: 80%;
       margin: 0 auto;
     }
 
@@ -375,10 +375,38 @@
       font-size: 0.72rem;
       color: #60a5fa;
       margin-top: 5px;
+      word-break: break-all;
+    }
+
+    /* ── Table column widths ───────────────────────────────────────── */
+    .col-id {
+      width: 80px;
+    }
+
+    .col-file {
+      width: auto;
+    }
+
+    .col-preset {
+      width: 90px;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 280px;
+    }
+
+    .col-mode {
+      width: 80px;
+    }
+
+    .col-params {
+      width: 230px;
+    }
+
+    .col-status {
+      width: 700px;
+    }
+
+    .col-del {
+      width: 80px;
+      white-space: nowrap;
     }
 
     .error-line {
@@ -662,19 +690,29 @@
         </div>
         <div class="table-wrap">
           <table>
+            <colgroup>
+              <col class="col-id">
+              <col class="col-file">
+              <col class="col-preset">
+              <col class="col-mode">
+              <col class="col-params">
+              <col class="col-status">
+              <col class="col-del">
+            </colgroup>
             <thead>
               <tr>
                 <th>ID</th>
                 <th>Archivo</th>
                 <th>Preset / CRF</th>
                 <th>Modo</th>
+                <th>Params</th>
                 <th>Estado</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="jobsTable">
               <tr class="empty-row">
-                <td colspan="6">Sin trabajos en cola</td>
+                <td colspan="7">Sin trabajos en cola</td>
               </tr>
             </tbody>
           </table>
@@ -718,7 +756,7 @@
 
         const tbody = document.getElementById('jobsTable');
         if (!data.jobs.length) {
-          tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Sin trabajos en cola</td></tr>';
+          tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin trabajos en cola</td></tr>';
           return;
         }
 
@@ -735,6 +773,10 @@
           const delBtn = job.status !== 'procesando'
             ? `<button class="btn btn-danger btn-sm" onclick="deleteJob('${job.id}')">Eliminar</button>` : '';
 
+          const extraParams = job.optional_params
+            ? `<span style="font-family:var(--mono); font-size:0.72rem; color:var(--text-muted); word-break:break-all">${esc(job.optional_params)}</span>`
+            : `<span style="color:var(--text-dim); font-size:0.72rem;">—</span>`;
+
           return `<tr>
           <td><code style="font-family:var(--mono); color:var(--text-muted)">${job.id}</code></td>
           <td>
@@ -742,6 +784,7 @@
           </td>
           <td><span style="font-family:var(--mono)">${job.preset} / ${job.crf}</span></td>
           <td>${modeTag}</td>
+          <td>${extraParams}</td>
           <td>${statusBadge}${progress}${summary}${errLine}</td>
           <td>${delBtn}</td>
         </tr>`;
