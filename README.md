@@ -136,11 +136,13 @@ Encodes the entire video in one pass:
 The timestamps CSV must have `Start` and `End` columns (values in **seconds**):
 
 ```csv
-Start,End
-12.500,45.000
+Start,End,Name
+12.500,45.000,--crf 50
 102.000,178.300
 310.000,420.000
 ```
+
+Name column is optional, but if present, it will override that segment av1 params.
 
 Save it as `<exactly_the_video_filename>.csv`, e.g.:
 

@@ -90,8 +90,22 @@
       align-items: center;
       gap: 8px;
       font-size: 0.82rem;
-      color: var(--text-muted);
       font-family: var(--mono);
+      padding: 4px 10px;
+      border-radius: var(--radius);
+      transition: all 0.3s ease;
+    }
+
+    #server-status.paused {
+      color: var(--text-dim);
+      border: 1px solid transparent;
+      opacity: 0.6;
+    }
+
+    #server-status.processing {
+      color: #3ecf8e;
+      border: 1px solid rgba(62, 207, 142, 0.4);
+      background: rgba(62, 207, 142, 0.06);
     }
 
     .dot {
@@ -407,7 +421,7 @@
     }
 
     .col-status {
-      width: 740px;
+      width: 650px;
     }
 
     .col-duration {
@@ -430,7 +444,7 @@
     .filename {
       font-family: var(--mono);
       font-size: 0.82rem;
-      max-width: 250px;
+      max-width: 90%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -758,13 +772,18 @@
         const res = await fetch('/api/jobs');
         const data = await res.json();
 
+        const statusContainer = document.getElementById('server-status');
         const dot = document.getElementById('status-dot');
         const txt = document.getElementById('status-text');
         if (data.is_running) {
           dot.classList.add('active');
+          statusContainer.classList.remove('paused');
+          statusContainer.classList.add('processing');
           txt.textContent = 'processing queue';
         } else {
           dot.classList.remove('active');
+          statusContainer.classList.remove('processing');
+          statusContainer.classList.add('paused');
           txt.textContent = 'queue paused';
         }
 

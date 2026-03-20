@@ -260,6 +260,41 @@ async def process_job(job: Job):
         await _process_job_standard(job, input_path)
 
 
+async def _add_mkv_metadata(job: Job, final_mkv: Path, dir_name: Path, base_name: str):
+    """Add encoder metadata to the final MKV file."""
+    try:
+        proc_ver = await asyncio.create_subprocess_exec(
+            "SvtAv1EncApp", "--version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await proc_ver.communicate()
+        encoder_version = stdout.decode(errors='ignore').splitlines()[0].strip() if stdout else "SvtAv1EncApp"
+    except Exception:
+        encoder_version = "SvtAv1EncApp"
+
+    video_params = f"--preset {job.preset} --crf {job.crf} --tune {job.tune}"
+    if job.optional_params:
+        video_params += f" {job.optional_params}"
+
+    xml_file = dir_name / f"{base_name}_temp.xml"
+    xml_file.write_text(f"""<?xml version="1.0"?>
+<!-- <!DOCTYPE Tags SYSTEM "matroskatags.dtd"> -->
+<Tags>
+  <Tag><Simple><Name></Name><String></String></Simple></Tag>
+  <Tag>
+    <Targets />
+    <Simple><Name>ENCODER</Name><String>{encoder_version}</String></Simple>
+    <Simple><Name>ENCODER_SETTINGS</Name><String>{video_params}</String></Simple>
+  </Tag>
+</Tags>""", encoding="utf-8")
+
+    await run_command(["mkvpropedit", str(final_mkv), "--tags", f"track:v1:{xml_file}"])
+    
+    if xml_file.exists():
+        xml_file.unlink()
+
+
 async def _process_job_segments(job: Job, input_path: Path, csv_path: str):
     """
     Segment-based encode via core.av1kut.
@@ -303,6 +338,9 @@ async def _process_job_segments(job: Job, input_path: Path, csv_path: str):
         work_dir=str(input_path.parent),
         log_file=str(log_txt),
     )
+
+    # Add metadata to the generated segments mode file
+    await _add_mkv_metadata(job, Path(output), dir_name, base_name)
 
     job.final_summary = f"Segments: {len(segments_data)} | Output: {Path(output).name}"
 
@@ -372,37 +410,10 @@ async def _process_job_standard(job: Job, input_path: Path):
     await run_command(cmd_mux)
 
     # 5. Add metadata
-    try:
-        proc_ver = await asyncio.create_subprocess_exec(
-            "SvtAv1EncApp", "--version",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        stdout, _ = await proc_ver.communicate()
-        encoder_version = stdout.decode(errors='ignore').splitlines()[0].strip() if stdout else "SvtAv1EncApp"
-    except Exception:
-        encoder_version = "SvtAv1EncApp"
-
-    video_params = f"--preset {job.preset} --crf {job.crf} --tune {job.tune}"
-    if job.optional_params:
-        video_params += f" {job.optional_params}"
-
-    xml_file = dir_name / f"{base_name}_temp.xml"
-    xml_file.write_text(f"""<?xml version="1.0"?>
-<!-- <!DOCTYPE Tags SYSTEM "matroskatags.dtd"> -->
-<Tags>
-  <Tag><Simple><Name></Name><String></String></Simple></Tag>
-  <Tag>
-    <Targets />
-    <Simple><Name>ENCODER</Name><String>{encoder_version}</String></Simple>
-    <Simple><Name>ENCODER_SETTINGS</Name><String>{video_params}</String></Simple>
-  </Tag>
-</Tags>""", encoding="utf-8")
-
-    await run_command(["mkvpropedit", str(final_mkv), "--tags", f"track:v1:{xml_file}"])
+    await _add_mkv_metadata(job, final_mkv, dir_name, base_name)
 
     # 6. Cleanup
-    for f in [video_ivf, audio_opus, log_txt, xml_file, timecodes]:
+    for f in [video_ivf, audio_opus, log_txt, timecodes]:
         if f.exists():
             f.unlink()
 
