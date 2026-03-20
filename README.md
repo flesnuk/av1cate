@@ -61,6 +61,35 @@ Optional flags:
 python run.py --port 9000 --reload   # dev mode with auto-reload
 ```
 
+## Systemd
+
+```bash
+sudo nano /etc/systemd/system/av1cate.service
+```
+
+```bash
+[Unit]
+Description=AV1 Encoding Queue Manager
+After=network.target
+
+[Service]
+User=dev
+Group=www-data
+WorkingDirectory=/home/dev/code/av1cate
+ExecStart=/home/dev/code/av1cate/venv/bin/uvicorn api.main:app --host [IP_ADDRESS] --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable av1cate.service
+sudo systemctl start av1cate.service
+sudo systemctl status av1cate.service
+```
+
 ---
 
 ## How It Works
