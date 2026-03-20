@@ -1,8 +1,10 @@
 # av1cate
 
-**AV1 encoding queue manager** with a web UI and intelligent segment-based encoding.
+**AV1 encoding queue manager** with a web UI and segment-based encoding.
 
 Built on **FastAPI** + **SvtAv1EncApp** + **mkvtoolnix** + **ffmpeg**.
+
+**SvtAv1EncApp** needs to be compiled with FFMS2 support and for segment-based encoding, it needs to use `--skip` and `--frames` flags.
 
 ---
 

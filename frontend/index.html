@@ -698,6 +698,7 @@
       <div class="card queue-section">
         <div class="section-header">
           <div class="card-title" style="margin:0;">Job queue</div>
+          <button class="btn btn-sm" onclick="clearCompleted()">Clear completed</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -862,8 +863,12 @@
     }
 
     async function deleteJob(id) {
-      if (!confirm('Delete this job?')) return;
       await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      fetchJobs();
+    }
+
+    async function clearCompleted() {
+      await fetch('/api/jobs/clear', { method: 'POST' });
       fetchJobs();
     }
 

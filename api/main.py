@@ -537,6 +537,22 @@ def delete_job(job_id: str):
     return {"message": "Job deleted"}
 
 
+@app.post("/api/jobs/clear")
+def clear_completed_jobs():
+    to_delete = [
+        job_id for job_id, job in jobs_db.items()
+        if job.status in [JobStatus.COMPLETED, JobStatus.ERROR]
+    ]
+    for j_id in to_delete:
+        if j_id in queue:
+            queue.remove(j_id)
+        del jobs_db[j_id]
+    if to_delete:
+        save_state()
+    return {"message": f"Cleared {len(to_delete)} jobs"}
+
+
+
 @app.post("/api/control/play")
 def play_queue():
     global is_running
