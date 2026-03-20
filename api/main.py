@@ -16,6 +16,7 @@ import shlex
 import uuid
 import re
 import time
+import logging
 import os
 from pathlib import Path
 from typing import List, Optional, Dict
@@ -27,6 +28,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from core import av1kut
+
+class SpecificEndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        log_msg = record.getMessage()
+        if "GET /api/jobs" in log_msg:
+            return False
+        return True
+
+uvicorn_logger = logging.getLogger("uvicorn.access")
+uvicorn_logger.addFilter(SpecificEndpointFilter())
 
 
 # ---------------------------------------------------------------------------
