@@ -11,6 +11,7 @@ Run with:  python run.py
 """
 
 import asyncio
+import json
 import shlex
 import uuid
 import re
@@ -73,6 +74,43 @@ current_process:  Optional[asyncio.subprocess.Process] = None
 current_job_id:   Optional[str]                    = None
 
 ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+
+STATE_FILE = Path(__file__).parent.parent / "jobs_state.json"
+
+def save_state():
+    state = {
+        "is_running": is_running,
+        "queue": queue,
+        "jobs": {k: v.dict() for k, v in jobs_db.items()}
+    }
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        print(f"Error saving state: {e}")
+
+def load_state():
+    global queue, jobs_db, is_running
+    if not STATE_FILE.exists():
+        return
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            state = json.load(f)
+        for job_id, job_dict in state.get("jobs", {}).items():
+            try:
+                job = Job(**job_dict)
+                if job.status == JobStatus.PROCESSING:
+                    job.status = JobStatus.PENDING
+                    job.current_progress = None
+                    job.start_time = None
+                jobs_db[job_id] = job
+            except Exception as j_err:
+                print(f"Error loading job {job_id}: {j_err}")
+        queue.clear()
+        queue.extend(state.get("queue", []))
+        is_running = state.get("is_running", False)
+    except Exception as e:
+        print(f"Error loading state: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -373,6 +411,7 @@ async def worker_loop():
             job.status = JobStatus.PROCESSING
             job.start_time = time.time()
             job.error_message = None
+            save_state()
 
             try:
                 await process_job(job)
@@ -380,16 +419,19 @@ async def worker_loop():
                     job.status = JobStatus.COMPLETED
                     job.end_time = time.time()
                     queue.pop(0)
+                    save_state()
             except InterruptedError:
                 job.status = JobStatus.PENDING
                 job.start_time = None
                 print(f"[job:{job_id}] Interrupted → pending.")
+                save_state()
             except Exception as e:
                 job.status = JobStatus.ERROR
                 job.end_time = time.time()
                 job.error_message = str(e)
                 queue.pop(0)
                 print(f"[job:{job_id}] Error: {e}")
+                save_state()
             finally:
                 current_process = None
                 current_job_id  = None
@@ -403,10 +445,15 @@ async def worker_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_state()
     task = asyncio.create_task(worker_loop())
     yield
     task.cancel()
-
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    save_state()
 
 app = FastAPI(title="AV1 Encoder API", version="2.0.0", lifespan=lifespan)
 
@@ -456,6 +503,7 @@ def create_job(job_in: JobCreate):
     new_job = Job(id=job_id, **job_in.dict())
     jobs_db[job_id] = new_job
     queue.append(job_id)
+    save_state()
     return new_job
 
 
@@ -485,6 +533,7 @@ def delete_job(job_id: str):
     if job_id in queue:
         queue.remove(job_id)
     del jobs_db[job_id]
+    save_state()
     return {"message": "Job deleted"}
 
 
@@ -492,6 +541,7 @@ def delete_job(job_id: str):
 def play_queue():
     global is_running
     is_running = True
+    save_state()
     return {"message": "Queue started"}
 
 
@@ -528,6 +578,7 @@ async def stop_queue():
         job.status = JobStatus.PENDING
         job.start_time = None
 
+    save_state()
     return {"message": "Queue stopped. Temp files deleted and task reset."}
 
 
